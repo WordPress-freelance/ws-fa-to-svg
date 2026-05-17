@@ -343,5 +343,10 @@ class WS_FA_To_SVG_Transformer {
 		$wpdb->query(
 			"DELETE FROM {$wpdb->options} WHERE option_name LIKE '\\_transient\\_ws\\_fa2svg\\_%' OR option_name LIKE '\\_transient\\_timeout\\_ws\\_fa2svg\\_%'"
 		);
+		// Invalide le cache d'objet WordPress : sans ça, get_transient() retournerait
+		// la valeur en RAM même après suppression DB (cache `options`/`alloptions`).
+		if ( function_exists( 'wp_cache_flush' ) ) {
+			wp_cache_flush();
+		}
 	}
 }
