@@ -14,6 +14,14 @@ if ( ! file_exists( "$_tests_dir/includes/functions.php" ) ) {
 	exit( 1 );
 }
 
+// Requis depuis WP 6.1 : yoast/phpunit-polyfills.
+if ( ! defined( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH' ) ) {
+	$polyfills = dirname( __DIR__, 2 ) . '/vendor/yoast/phpunit-polyfills';
+	if ( is_dir( $polyfills ) ) {
+		define( 'WP_TESTS_PHPUNIT_POLYFILLS_PATH', $polyfills );
+	}
+}
+
 require_once "$_tests_dir/includes/functions.php";
 
 /**
