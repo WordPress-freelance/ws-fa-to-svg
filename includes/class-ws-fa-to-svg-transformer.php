@@ -186,6 +186,10 @@ class WS_FA_To_SVG_Transformer {
 		$viewbox  = isset( $parts[0] ) ? $parts[0] : '0 0 24 24';
 		$inner    = isset( $parts[1] ) ? $parts[1] : '';
 
+		// Neutralise tout SVG contenant du contenu actif — protection contre les
+		// icônes injectées via le filter ws_fa2svg_icons par un tiers.
+		$inner = self::sanitize_svg_inner( $inner );
+
 		// Aria.
 		$aria_label = '';
 		if ( preg_match( '/\baria-label\s*=\s*(["\'])([^"\']*)\1/i', $orig_attrs, $am ) ) {
@@ -348,5 +352,71 @@ class WS_FA_To_SVG_Transformer {
 		if ( function_exists( 'wp_cache_flush' ) ) {
 			wp_cache_flush();
 		}
+	}
+
+	/**
+	 * Nettoie le contenu inner d'un SVG avant injection dans le DOM.
+	 * Supprime les balises actives (script, style, foreignObject, iframe, object,
+	 * embed, use externe), les gestionnaires d'événements on* et les schémas
+	 * javascript: dans href/xlink:href.
+	 *
+	 * Défense en profondeur : le mapping bundled est sûr par construction, mais
+	 * un tiers peut hooker ws_fa2svg_icons pour injecter du SVG arbitraire.
+	 *
+	 * @param string $inner Inner content d'un SVG (paths, groupes, etc.).
+	 * @return string
+	 */
+	public static function sanitize_svg_inner( $inner ) {
+		if ( ! is_string( $inner ) || '' === $inner ) {
+			return '';
+		}
+
+		// Balises actives : suppression complète (open→close, self-closing, orphelines).
+		$dangerous_tags = array(
+			'script', 'style', 'foreignObject', 'iframe', 'object', 'embed',
+			'animate', 'animateTransform', 'animateMotion', 'set', 'audio', 'video',
+			'handler', 'listener',
+		);
+		foreach ( $dangerous_tags as $tag ) {
+			$pattern = '#<\s*' . preg_quote( $tag, '#' ) . '\b[^>]*(?:/\s*>|>.*?<\s*/\s*' . preg_quote( $tag, '#' ) . '\s*>|>)#is';
+			$inner   = preg_replace( $pattern, '', $inner );
+		}
+
+		// Gestionnaires d'événements on* (onclick, onload, onmouseover…).
+		$inner = preg_replace( '#\son[a-z]+\s*=\s*"[^"]*"#i', '', $inner );
+		$inner = preg_replace( "#\son[a-z]+\s*=\s*'[^']*'#i", '', $inner );
+		$inner = preg_replace( '#\son[a-z]+\s*=\s*[^\s>]+#i', '', $inner );
+
+		// href="javascript:...", xlink:href="javascript:...", data:text/html
+		$inner = preg_replace_callback(
+			'#\b(?:xlink:)?href\s*=\s*(["\'])([^"\']*)\1#i',
+			function( $m ) {
+				$val = trim( $m[2] );
+				if ( preg_match( '#^\s*(?:javascript|vbscript|data:text/html)#i', $val ) ) {
+					return '';
+				}
+				return $m[0];
+			},
+			$inner
+		);
+
+		// <use href="external.svg#..."> ou xlink:href externe : bloquer les URLs
+		// distantes, garder uniquement les fragments locaux (#id).
+		$inner = preg_replace_callback(
+			'#<\s*use\b([^>]*)>#i',
+			function( $m ) {
+				$attrs = $m[1];
+				if ( preg_match( '#\b(?:xlink:)?href\s*=\s*(["\'])([^"\']*)\1#i', $attrs, $hm ) ) {
+					$href = trim( $hm[2] );
+					if ( '' !== $href && '#' !== substr( $href, 0, 1 ) ) {
+						return '';
+					}
+				}
+				return $m[0];
+			},
+			$inner
+		);
+
+		return $inner;
 	}
 }

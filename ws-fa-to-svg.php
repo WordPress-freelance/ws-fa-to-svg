@@ -3,7 +3,7 @@
  * Plugin Name:       WS Font Awesome to SVG
  * Plugin URI:        https://wordpress-freelance.com/plugins/ws-fa-to-svg/
  * Description:       Remplace les icônes Font Awesome par des SVG inline pour booster PageSpeed. 30 icônes essentielles. <strong>Version PRO : 300+ icônes + scanner intégré.</strong>
- * Version:           2.0.0
+ * Version:           2.0.1
  * Requires at least: 5.6
  * Requires PHP:      7.4
  * Author:            WebStrategy
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WS_FA2SVG_VERSION', '2.0.0' );
+define( 'WS_FA2SVG_VERSION', '2.0.1' );
 define( 'WS_FA2SVG_FILE', __FILE__ );
 define( 'WS_FA2SVG_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WS_FA2SVG_URL', plugin_dir_url( __FILE__ ) );

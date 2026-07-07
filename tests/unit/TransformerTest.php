@@ -305,4 +305,122 @@ class TransformerTest extends WebStrategyTestCase {
 		$this->assertStringContainsString( 'transient', $wpdb->last_query );
 		$this->assertStringContainsString( 'fa2svg', $wpdb->last_query );
 	}
+
+	// ---------------------------------------------------------------- sanitize_svg_inner
+
+	/** @test */
+	public function sanitize_svg_inner_returns_empty_for_non_string_or_empty() {
+		$this->assertSame( '', \WS_FA_To_SVG_Transformer::sanitize_svg_inner( '' ) );
+		$this->assertSame( '', \WS_FA_To_SVG_Transformer::sanitize_svg_inner( null ) );
+		$this->assertSame( '', \WS_FA_To_SVG_Transformer::sanitize_svg_inner( 42 ) );
+	}
+
+	/** @test */
+	public function sanitize_svg_inner_preserves_legitimate_paths() {
+		$safe = '<path d="M0 0h24v24H0z" fill="currentColor"/>';
+		$out  = \WS_FA_To_SVG_Transformer::sanitize_svg_inner( $safe );
+		$this->assertStringContainsString( '<path', $out );
+		$this->assertStringContainsString( 'M0 0h24v24H0z', $out );
+	}
+
+	/**
+	 * @test
+	 * @dataProvider dangerous_svg_payloads
+	 */
+	public function sanitize_svg_inner_strips_active_content( $payload, $forbidden, $label ) {
+		$out = \WS_FA_To_SVG_Transformer::sanitize_svg_inner( $payload );
+		foreach ( (array) $forbidden as $needle ) {
+			$this->assertStringNotContainsString( $needle, $out, "$label : « $needle » ne devrait pas subsister" );
+		}
+	}
+
+	public function dangerous_svg_payloads() {
+		return array(
+			// script tags.
+			array(
+				'<path d="M0 0"/><script>alert(1)</script>',
+				array( '<script', 'alert(1)' ),
+				'script inline',
+			),
+			array(
+				'<script src="//evil.com/x.js"></script><path d="M0 0"/>',
+				array( '<script', 'evil.com' ),
+				'script externe',
+			),
+			array(
+				'<script/><path d="M0 0"/>',
+				array( '<script' ),
+				'script orphelin auto-fermant',
+			),
+			// event handlers.
+			array(
+				'<path d="M0 0" onload="alert(1)"/>',
+				array( 'onload', 'alert(1)' ),
+				'onload attribute',
+			),
+			array(
+				"<path d='M0 0' onclick='alert(1)'/>",
+				array( 'onclick' ),
+				'onclick avec simples quotes',
+			),
+			array(
+				'<path onmouseover=alert(1)/>',
+				array( 'onmouseover', 'alert(1)' ),
+				'onmouseover sans quotes',
+			),
+			// href javascript:.
+			array(
+				'<a href="javascript:alert(1)"><path d="M0 0"/></a>',
+				array( 'javascript:alert' ),
+				'href javascript:',
+			),
+			array(
+				'<use xlink:href="javascript:alert(1)"/>',
+				array( 'javascript:alert' ),
+				'xlink:href javascript:',
+			),
+			// foreignObject.
+			array(
+				'<foreignObject><body><script>x</script></body></foreignObject><path d="M0 0"/>',
+				array( 'foreignObject', '<script' ),
+				'foreignObject wrapper',
+			),
+			// use externe.
+			array(
+				'<use href="https://evil.com/x.svg#foo"/><path d="M0 0"/>',
+				array( 'evil.com', '<use' ),
+				'use avec URL externe',
+			),
+			// animate SMIL.
+			array(
+				'<animate attributeName="href" values="javascript:alert(1)"/><path d="M0 0"/>',
+				array( '<animate', 'javascript:' ),
+				'animate SMIL',
+			),
+			// data:text/html embed.
+			array(
+				'<a href="data:text/html,<script>x</script>"><path/></a>',
+				array( 'data:text/html' ),
+				'data:text/html URI',
+			),
+		);
+	}
+
+	/** @test */
+	public function sanitize_svg_inner_preserves_local_fragment_use() {
+		$svg = '<defs><path id="p" d="M0 0"/></defs><use href="#p"/>';
+		$out = \WS_FA_To_SVG_Transformer::sanitize_svg_inner( $svg );
+		$this->assertStringContainsString( '<use', $out, 'use avec fragment local #id doit être conservé' );
+		$this->assertStringContainsString( '#p', $out );
+	}
+
+	/** @test */
+	public function build_svg_output_never_contains_active_content_when_icon_data_is_malicious() {
+		// Simule une icône polluée injectée via le filter ws_fa2svg_icons.
+		$evil     = '0 0 24 24|<path d="M0 0"/><script>alert(1)</script><path onload="x"/>';
+		$out      = $this->make_transformer()->build_svg( $evil, 'evil', '', '' );
+		$this->assertStringNotContainsString( '<script', $out );
+		$this->assertStringNotContainsString( 'alert(1)', $out );
+		$this->assertStringNotContainsString( 'onload', $out );
+	}
 }

@@ -4,7 +4,7 @@ Tags: font-awesome, svg, performance, pagespeed, core-web-vitals
 Requires at least: 5.6
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 2.0.0
+Stable tag: 2.0.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -103,6 +103,9 @@ Si votre thème charge FA via un `<link>` en dur dans `header.php`, le plugin ne
 3. Comparatif PageSpeed avant / après installation du plugin
 
 == Changelog ==
+
+= 2.0.1 =
+* Sécurité : durcissement du builder SVG contre les balises actives (script, foreignObject, iframe, animate…), les gestionnaires d'événements on* et les schémas javascript:/data:text/html dans href/xlink:href. Défense en profondeur contre un SVG injecté via le filter ws_fa2svg_icons par un tiers.
 
 = 2.0.0 =
 * Refonte complète : structure WPPB strict.
